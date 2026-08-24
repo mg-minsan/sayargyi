@@ -1,0 +1,14 @@
+.venv
+.git
+.github
+.claude
+.vscode
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.kernel
+.DS_Store
+evaluations
+grafana
+uv.lock.bak

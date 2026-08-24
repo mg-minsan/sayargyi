@@ -1,0 +1,39 @@
+question,answer_agent,answer_score,answer_reasoning,trajectory_score,trajectory_reasoning
+2. Why does Byzantine failure handling need more replicas than fail-stop handling?,"Based on the papers in the database, here is the answer.
+
+## Why Byzantine handling needs more replicas
+
+### The core result
+The exact replication requirements are established in Dwork, Lynch & Stockmeyer's *""Consensus in the Presence of Partial Synchrony""*:
+
+- **Fail-stop faults:** t-resilient consensus is possible **iff N ≥ 2t + 1**
+- **Byzantine faults (with or without authentication):** t-resilient consensus is possible **iff N ≥ 3t + 1**
+
+The same paper states this as: ""For fail-stop or omission faults we show that t-resilient consensus is possible iff N ≥ 2t + 1. For Byzantine faults with authentication, we show that t-resilient consensus is possible iff N ≥ 3t + 1.""
+
+### The reason for the difference
+The distinction comes from the failure model itself (Schneider's *""Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial""*):
+
+- **Fail-stop failure:** the component changes to a state that permits other components to detect the failure, and then stops. A fail-stop replica behaves correctly until it halts, and **never sends conflicting messages** — it simply stops participating.
+- **Byzantine failure:** the component can exhibit arbitrary and malicious behavior, perhaps involving collusion with other faulty components. A Byzantine replica can **equivocate — send contradictory messages to different replicas**, forge data, or actively lie while pretending to be correct.
+
+With **fail-stop** replicas, a majority of *f + 1* replies from a *2f + 1* ensemble suffices: any two such majorities intersect in at least one correct replica, and since correct replicas never contradict themselves, this guarantees agreement.
+
+With **Byzantine** replicas, this no longer works. Because faulty replicas may vote for both sides simultaneously (equivocate) and may collude, a simple majority could be made up entirely of liars. You must require a quorum of *2f + 1* agreeing replicas, and two such quorums only intersect in a correct replica if the total is at least *3f + 1*. The bound is tight: *""A Hundred Impossibility Proofs for Distributed Systems""* notes that reaching agreement among *3t* processes in the presence of *t* Byzantine faults is impossible — the classic one-third bound (n < 3t is unachievable).
+
+### Same principle on the client side
+Schneider's tutorial gives the client-side analogue:
+> ""If Byzantine failures are possible, then a t-fault tolerant client requires 2t+1-fold replication and a command is performed after t+1 requests received. If failures are restricted to fail-stop, then t+1-fold replication will suffice, and a command can be performed after a single request.""
+
+This reflects the same theme: with Byzantine failures you cannot trust a single response or a bare majority, because a faulty replica might be lying; you must collect enough agreeing responses (t+1, i.e., more than the number of tolerated faults) to guarantee at least one honest reply, which forces the larger *2t+1* replication factor on the client.
+
+### Summary
+| Failure model | Total replicas (N) | Quorum size | Why |
+|---|---|---|---|
+| Fail-stop | 2f + 1 | f + 1 (majority) | Correct replicas never contradict; any two majorities intersect in a correct replica |
+| Byzantine | 3f + 1 | 2f + 1 (supermajority) | Faulty replicas can equivocate and collude; two quorums must still intersect in at least one correct replica, and a quorum must exceed the number of faults |
+
+**Key sources:**
+- *Consensus in the Presence of Partial Synchrony* (Dwork, Lynch, Stockmeyer)
+- *Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial* (Schneider)
+- *A Hundred Impossibility Proofs for Distributed Systems* (for the 3t impossibility bound)",bad,"The agent's final answer gives consensus bounds (fail-stop N >= 2f+1, Byzantine N >= 3f+1) instead of Schneider's state-machine replication bounds. The original tutorial says fail-stop requires t+1 replicas and Byzantine requires 2t+1 replicas for a t fault-tolerant state machine. Although the agent explains the general difference between failure models, the key numerical information is incorrect for the expected answer.",good,"The search queries are relevant and contain important keywords such as 'Byzantine failure handling', 'fail-stop', 'replicas', and specific replication bounds. The later searches refine the initial query, and four searches is only slightly more than the usual 1-3, but the refinements are related and support the final answer."

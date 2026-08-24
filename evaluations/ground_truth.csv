@@ -1,0 +1,56 @@
+question,title,filename
+"1. How do blocks, transactions, and state updates fit together in Ethereum's state-machine model?",Ethereum: a secure decentralized generalized transaction ledger,digital_currency__paper.json
+"2. What makes an Ethereum account considered empty or dead, and why does that matter for state cleanup?",Ethereum: a secure decentralized generalized transaction ledger,digital_currency__paper.json
+3. How do EIP-1559 base fees and priority fees differ for type 0/1 versus type 2 transactions?,Ethereum: a secure decentralized generalized transaction ledger,digital_currency__paper.json
+"4. What checks must a transaction pass before execution, especially around nonce, gas, balance, and sender code?",Ethereum: a secure decentralized generalized transaction ledger,digital_currency__paper.json
+"5. How do contract creation and message calls differ in how they handle initialization code, returned code, and errors?",Ethereum: a secure decentralized generalized transaction ledger,digital_currency__paper.json
+1. How does replicating a state machine make a distributed service fault tolerant?,Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial,distributed_systems__SMSurvey.json
+2. Why does Byzantine failure handling need more replicas than fail-stop handling?,Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial,distributed_systems__SMSurvey.json
+3. What’s the difference between agreement and ordering when keeping replicas consistent?,Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial,distributed_systems__SMSurvey.json
+4. When can request ordering be relaxed because operations commute?,Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial,distributed_systems__SMSurvey.json
+5. How do reconfiguration and repaired components help a replicated service survive ongoing faults?,Implementing Fault-Tolerant Services Using the State Machine Approach: A Tutorial,distributed_systems__SMSurvey.json
+1. How does PageRank treat a page with few backlinks from very important pages versus many links from obscure pages?,The PageRank Citation Ranking: Bringing Order to the Web,information_retrieval__the-pagerank-citation-ranking-bringing-order-to-the-web.json
+"2. Why does the random-surfer model include a jump factor, and what problem does it solve in the link graph?",The PageRank Citation Ranking: Bringing Order to the Web,information_retrieval__the-pagerank-citation-ranking-bringing-order-to-the-web.json
+"3. What is a dangling link, and why are dangling pages removed during PageRank computation?",The PageRank Citation Ranking: Bringing Order to the Web,information_retrieval__the-pagerank-citation-ranking-bringing-order-to-the-web.json
+4. How does choosing different source distributions change PageRank into a personalized ranking?,The PageRank Citation Ranking: Bringing Order to the Web,information_retrieval__the-pagerank-citation-ranking-bringing-order-to-the-web.json
+5. Why can PageRank improve search results for vague queries more than simple backlink counting?,The PageRank Citation Ranking: Bringing Order to the Web,information_retrieval__the-pagerank-citation-ranking-bringing-order-to-the-web.json
+1. What’s the main difference between classic FRP behaviors/events and signal-function-based FRP?,Abstract,languages-paradigms__a-survey-of-functional-reactive-programming.json
+2. How do signal functions help avoid the time and space leaks common in classic FRP?,Abstract,languages-paradigms__a-survey-of-functional-reactive-programming.json
+3. Why does N-ary FRP use signal vectors instead of plain tuples of signals?,Abstract,languages-paradigms__a-survey-of-functional-reactive-programming.json
+4. What makes event-driven or push-pull evaluation more efficient than constantly resampling FRP expressions?,Abstract,languages-paradigms__a-survey-of-functional-reactive-programming.json
+5. How do dynamic collections and switching enable modular systems like games or synthesizers in FRP?,Abstract,languages-paradigms__a-survey-of-functional-reactive-programming.json
+1. How does the distinction between propositions and assertions affect the way inference rules should be understood?,Per Martin-L¨ of,logic_and_programming__Martin-Lof83.json
+2. Why does Martin-Löf treat knowing a judgement as essentially the same as having evidence for it?,Per Martin-L¨ of,logic_and_programming__Martin-Lof83.json
+"3. What is the difference between a judgement and an evident judgement, and how does proof relate to that difference?",Per Martin-L¨ of,logic_and_programming__Martin-Lof83.json
+"4. How are implication, conjunction, disjunction, and quantifiers explained in terms of what counts as a verification?",Per Martin-L¨ of,logic_and_programming__Martin-Lof83.json
+5. Why does intuitionistic logic reject the idea of true propositions that can never be proved?,Per Martin-L¨ of,logic_and_programming__Martin-Lof83.json
+1. Why can quiescent-state reclamation stall completely if one thread never reaches a quiescent point?,Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation,memory_management__hart_ipdps06.json
+"2. What makes epoch-based reclamation easier to use than quiescent-state-based reclamation, and why does it still add overhead?",Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation,memory_management__hart_ipdps06.json
+"3. How do hazard pointers protect nodes during traversal, and why does their cost grow on long lists?",Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation,memory_management__hart_ipdps06.json
+4. Why does lock-free reference counting perform so poorly compared with the other reclamation schemes?,Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation,memory_management__hart_ipdps06.json
+5. When are blocking reclamation methods actually faster than non-blocking ones for lockless data structures?,Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation,memory_management__hart_ipdps06.json
+1. How does using fetch-and-add instead of compare-and-swap help a queue perform better under heavy contention?,A Wait-free Queue as Fast as Fetch-and-Add (2016),non_blocking_algorithms__a-wait-free-queue-as-fast-as-fetch-and-add.json
+2. What makes this FIFO queue wait-free while still preserving linearizability?,A Wait-free Queue as Fast as Fetch-and-Add (2016),non_blocking_algorithms__a-wait-free-queue-as-fast-as-fetch-and-add.json
+3. How does the fast-path/slow-path design guarantee progress without making common operations too expensive?,A Wait-free Queue as Fast as Fetch-and-Add (2016),non_blocking_algorithms__a-wait-free-queue-as-fast-as-fetch-and-add.json
+"4. Why does the queue use epoch-based reclamation and hazard pointers, and what overhead does that avoid on x86?",A Wait-free Queue as Fast as Fetch-and-Add (2016),non_blocking_algorithms__a-wait-free-queue-as-fast-as-fetch-and-add.json
+"5. How can dequeue operations sometimes help enqueues, and why is that needed for correctness and wait-freedom?",A Wait-free Queue as Fast as Fetch-and-Add (2016),non_blocking_algorithms__a-wait-free-queue-as-fast-as-fetch-and-add.json
+1. Why are input and output treated as primitive operations rather than just assignment or shared-memory updates?,"Programming Teclmiques S. L. Graham,  R. L. Rivest Editors",processes__CSP-hoare.json
+"2. How does a parallel command coordinate multiple processes, and when does it actually terminate?","Programming Teclmiques S. L. Graham,  R. L. Rivest Editors",processes__CSP-hoare.json
+"3. What makes guarded input different from ordinary input, especially inside alternatives and loops?","Programming Teclmiques S. L. Graham,  R. L. Rivest Editors",processes__CSP-hoare.json
+4. How can coroutines be used to model subroutines or even multiple-entry procedures?,"Programming Teclmiques S. L. Graham,  R. L. Rivest Editors",processes__CSP-hoare.json
+"5. Why does the dining philosophers example still allow starvation, and how could limiting entry help?","Programming Teclmiques S. L. Graham,  R. L. Rivest Editors",processes__CSP-hoare.json
+"1. Why does logistic-loss boosting help reduce bad top results, and how does label scaling preserve ranking among positives?",Yahoo,search-engines__adf0361-yinA.json
+"2. How do contextual reranking features like rank, mean, variance, and topic similarity improve results after the first ranking stage?",Yahoo,search-engines__adf0361-yinA.json
+"3. How do click similarity, translated text matching, and deep semantic matching each help with the query–document vocabulary gap?",Yahoo,search-engines__adf0361-yinA.json
+"4. Why is query rewriting treated like machine translation, and why does blending rewritten and original results work better than replacement?",Yahoo,search-engines__adf0361-yinA.json
+5. How are freshness and location combined with base relevance so the system boosts only time-sensitive or local queries?,Yahoo,search-engines__adf0361-yinA.json
+1. How does QuickCheck use random inputs to validate algebraic laws like reverse distributing over append?,QuickCheck Testing for Fun and Profit,testing__fulltext.json
+"2. Why does the skew heap balance property fail after deletions, even though inserts preserve the heap invariant?",QuickCheck Testing for Fun and Profit,testing__fulltext.json
+3. How do credits explain the logarithmic amortized cost of insert and deleteMin operations on skew heaps?,QuickCheck Testing for Fun and Profit,testing__fulltext.json
+"4. Why is a state-machine model needed for testing the process registry, instead of simple one-shot properties?",QuickCheck Testing for Fun and Profit,testing__fulltext.json
+5. How does shrinking help isolate minimal failing command sequences in concurrent or stateful QuickCheck tests?,QuickCheck Testing for Fun and Profit,testing__fulltext.json
+1. Why can binary translation handle x86 virtualization even though trap-and-emulate alone doesn’t work well?,A Comparison of Software and Hardware Techniques for x86 Virtualization,virtual_machines__asplos235_adams.json
+2. What makes hardware-assisted virtualization slower than expected on workloads with lots of page-table activity?,A Comparison of Software and Hardware Techniques for x86 Virtualization,virtual_machines__asplos235_adams.json
+3. How does adaptive binary translation reduce traps from guest memory and privileged instruction accesses?,A Comparison of Software and Hardware Techniques for x86 Virtualization,virtual_machines__asplos235_adams.json
+4. Why do system-call-heavy workloads often favor hardware virtualization over software binary translation?,A Comparison of Software and Hardware Techniques for x86 Virtualization,virtual_machines__asplos235_adams.json
+5. How would nested paging change the cost of shadow page tables and hidden page faults?,A Comparison of Software and Hardware Techniques for x86 Virtualization,virtual_machines__asplos235_adams.json

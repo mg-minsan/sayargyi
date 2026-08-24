@@ -1,0 +1,231 @@
+question,answer_agent,answer_score,answer_reasoning,trajectory_score,trajectory_reasoning
+"5. How do contract creation and message calls differ in how they handle initialization code, returned code, and errors?","Based on the Ethereum yellow paper (*Ethereum: a secure decentralized generalized transaction ledger* by Gavin Wood), here is how contract creation (the Λ function) and message calls (the Θ function) differ in their handling of initialization code, returned code, and errors:
+
+## 1. Initialization code
+
+- **Contract creation** runs *initialisation EVM code* (`i`), an arbitrary-length byte array supplied as a parameter. While this init code executes, the newly created address exists but has **no intrinsic body code** — `EXTCODESIZE` on that address returns zero, while `CODESIZE` returns the length of the initialization code. Any message call received by the address during init execution causes no code to be executed. The init code can alter storage, create further accounts, and make message calls.
+- **Message calls** do not run initialization code. Instead, they execute the **pre-existing code of the recipient account** (`c`, the account whose code is to be executed, usually the same as the recipient `r`). The parameters are sender `s`, originator `o`, recipient `r`, code-owning account `c`, available gas `g`, value `v`, gas price `p`, and the input data `d` (an arbitrary-length byte array) — which serves as the call's input rather than its program.
+
+## 2. Returned code
+
+- **Contract creation**: the output byte sequence `o` produced by the initialization code **specifies the final body code of the newly-created account**. If init code completes successfully, a code-deposit cost `c` proportional to the created code's size (G_codedeposit = 200 gas per byte) must be paid; if insufficient gas remains, an out-of-gas exception is declared and the code is not stored. (The code also must not begin with byte `0xef`, per EIP-3541.)
+- **Message calls**: the output `o` is an *extra component* of the result — a byte array returned to the caller, **not stored as code anywhere**. When a message call is initiated by VM-code execution, this output data is used by the caller; when the call is a top-level transaction, the output is ignored entirely.
+
+## 3. Errors
+
+- **Contract creation**: On an out-of-gas exception (or similar), the evaluated state is the empty set and the **entire create operation has no effect on the state** — the value is not transferred to the aborted contract's address and the contract's code is not stored. Gas remaining is zero in any such exceptional condition, so the intrinsic cost of contract creation is paid regardless. However, if the init code **reverts** (state empty and output empty), the remaining gas is *not* depleted (provided there is no other exception), but **no new account is created**. Subtlety: if init execution ends with a normal STOP or returns empty code, a ""zombie account"" is left, and any remaining balance is locked forever.
+- **Message calls**: Exceptions (insufficient gas, invalid instruction, stack underflow, invalid jump destination, stack exceeding 1024, or state modification during a static call) cause the machine to **halt immediately and discard state changes**, reporting the issue to the execution agent — either the transaction processor or, recursively, the spawning execution environment, which ""deals with it separately."" So a failed message call is a recoverable failure that propagates to its caller, unlike a creation exception which voids the whole creation.
+
+## Summary table
+
+| Aspect | Contract creation (Λ) | Message call (Θ) |
+|---|---|---|
+| Code executed | Initialization code `i` (produces account body) | Pre-existing recipient account code `c`, with input data `d` |
+| Returned bytes | Become the new account's stored code (after code-deposit cost) | Output data returned to caller; ignored at transaction level |
+| Error (OOG/exception) | Whole creation voided; value not transferred; no code stored; gas spent (except REVERT keeps gas, creates nothing) | Machine halts; state changes discarded; failure reported to caller/spawning environment |
+| Special case | Empty/STOP-init code leaves a ""zombie account"" with locked balance | N/A |
+
+These distinctions are described in Sections 7.2 (message call, Θ), 7.3 (contract creation, Λ), 9.4–9.5 (execution overview, exceptional halting), and the subtleties note in Section 7.1 of the paper.",good,"The final answer correctly covers the three requested differences. It explains that contract creation executes initialization code and returns body code stored as the new account's code (subject to code-deposit cost), while message calls execute the recipient's existing code and return output data that is not stored. It also accurately describes error handling: contract creation exceptions void the entire creation and transfer no value, with the revert special case not depleting gas but creating no account, while message call exceptions revert state changes and discard gas. It matches the ground truth key information.",bad,"The search queries are relevant and include important keywords such as contract creation, message call, initialization code, output, errors, exception, and yellow paper. Later queries refine earlier ones to target specific subtleties. However, the agent made nine search calls, which is excessive. Many queries overlap in content and could have been consolidated into 1-3 searches. There is no clear reason for that many tool calls, so the trajectory is not reasonable."
+5. How do reconfiguration and repaired components help a replicated service survive ongoing faults?,"Based on the papers in the database, here's how reconfiguration and repaired components help a replicated service survive ongoing faults:
+
+## Removing faulty components (reconfiguration)
+
+**Reconfiguration removes faulty components so they can no longer harm the service.** In Schneider's state machine approach tutorial, reconfiguration is explicitly described as ""removing faulty components and integrating repaired components"" [SMSurvey]. A configurator — a failure/recovery detection mechanism, one per component — detects a failure and issues a request to alter the configuration. A key safety property is that **only a faulty element is removed** from the configuration [SMSurvey]. This is echoed in the SIFT design: ""After identifying the faulty unit, the system will be reconfigured to prevent that unit from having any further effect"" — tasks are reassigned from a faulty processing module to other modules, and a faulty bus is bypassed [SIFT]. Removing a faulty replica prevents it from corrupting outputs or blocking agreement, so the remaining non-faulty replicas continue to make progress.
+
+## Integrating repaired (or replacement) components
+
+**Repaired components are re-integrated by first bringing them up to date.** Two problems must be solved when changing configuration: (1) the membership (clients, replicas, output devices) must be available when needed, and (2) whenever an element is added, ""the state of that element must be updated to reflect the current state of the system"" [SMSurvey]. In practice this is a state-transfer/synchronization step: a recovered site ""must first synchronize with its replacement site to integrate modifications"" before the new configuration takes effect [Transactional storage for geo-replicated systems], and chain-replication reintegration proceeds in two steps — state transfer with the predecessor, then verification with the successor [Tiered replication]. Processors often expose internal failure-detection circuitry that a configurator polls ""to determine whether that element is faulty or has been repaired and restarted"" [SMSurvey].
+
+## Why this combination survives ongoing faults
+
+The core benefit is that **reconfiguration continually restores the redundancy budget, so the service can tolerate an unbounded sequence of faults over time**. Each fault temporarily consumes one unit of the system's fault-tolerance capacity; removing the faulty component and re-integrating a repaired (or spare) one replenishes that capacity. As SIFT puts it: ""After reconfiguration, the system will be able to withstand a new failure—assuming that there are enough nonfaulty units remaining"" [SIFT]. Schneider makes the same point: when failures (including Byzantine ones) can be detected, ""a higher degree of fault tolerance can be achieved by reconfiguration"" [SMSurvey]. Replica sets can even be made adaptive — replicas track which ones are active and ""a special command is used to change the set of replicas in case one or more are suspected of having failed"" [Paxos Made Moderately Complex].
+
+Practically, fast reconfiguration also minimizes disruption: with chain replication, ""the duration of each transient outage is far shorter than the time required to remove a faulty host or to add a new host, so client request processing proceeds with minimal disruption in the face of failure, recovery, and other reconfiguration"" [Chain Replication]. GFS similarly treats component failures as the norm and relies on fast recovery plus replication as its core availability strategies [GFS].
+
+**In short:** reconfiguration ejects failed replicas so they can't interfere, and re-integrates repaired/replacement replicas (after state synchronization) so the system regains the required number of non-faulty replicas — allowing it to keep functioning through an ongoing sequence of faults rather than being permanently degraded after the first failure.",good,"The agent's final answer captures the key points from the original Section 7 content: reconfiguration removes faulty components so they cannot interfere, repaired components must be brought up to date with the current system state before rejoining, and this replenishes fault-tolerance capacity so the system can tolerate ongoing faults over time. It does not reproduce the exact Combining Condition formula or all protocols, but it provides the same core explanation and is correct.",bad,"The search queries are all relevant and include important keywords such as reconfiguration, repaired components, state machine, faulty replica, and reintegration. However, the agent made nine search calls, many of which are near-duplicates of each other with only slight wording changes. While some later queries refine toward specific sections and concepts, the large number of overlapping searches is excessive and lacks a clear reason, making the trajectory inefficient."
+4. How does choosing different source distributions change PageRank into a personalized ranking?,"Based on the papers in my database (primarily Brin & Page's original PageRank paper and the Google paper), here's how choosing different source distributions turns PageRank into a personalized ranking:
+
+## The source distribution (E vector) as the personalization knob
+
+In the PageRank formulation, the computation includes a vector **E** over web pages that serves as a *source of rank*. Intuitively, E is the **distribution of web pages that a random surfer periodically jumps to** when ""getting bored"" and abandoning link-following (i.e., the teleportation distribution). Beyond fixing the rank-sink problem, E is ""a powerful parameter to adjust the page ranks"" — it ""can be used to give broad general views of the Web or views which are focussed and personalized to a particular individual"" (Brin & Page, *The PageRank Citation Ranking*).
+
+## From global to personalized ranking
+
+- **Uniform E → global PageRank:** In most experiments, E is uniform over all web pages (with ‖E‖₁ = 0.15), meaning the surfer jumps to a *random* page. This is described as a ""very democratic choice,"" producing the standard global ranking where every page is valued simply because it exists.
+- **Non-uniform / biased E → personalized ranking:** If E is instead concentrated on pages that reflect a user's interests, the stationary distribution of the random walk shifts. Pages reachable (in the link-structure sense) from those preferred source pages are boosted, while pages unrelated to the chosen sources are demoted. The result is a ""customized"" or personalized ranking.
+
+## Concrete examples from the papers
+
+- **Single-page E:** Setting E to consist *entirely of a single web page* produces rankings ""from the perspective"" of that page. The authors tested E = the Netscape home page (the perspective of a novice user with Netscape as default home page) and E = John McCarthy's home page (the perspective of an individual whose interests are inferred from the links on his page).
+- **Bookmarks/home page personalization:** The Google paper notes that ""PageRank can be personalized by increasing the weight of a user's home page or bookmarks,"" and that adding the damping factor to ""a single page, or a group of pages... allows for personalization.""
+- **Personal search engines:** Such personalized PageRanks can power personal search engines that ""efficiently guess a large part of [users'] interests given simple input such as their bookmarks or home page."" The paper illustrates this with a ""Mitchell"" query, where the personalized ranking surfaces the home page of John McCarthy's colleague John Mitchell first, rather than other unrelated people named Mitchell.
+- **Resistance to manipulation:** These personalized PageRanks are noted to be ""virtually immune to manipulation by commercial interests,"" since a page must earn links from important pages (or many non-important ones) to rank highly — a property that is important for search quality.
+
+## Summary
+
+Changing the source distribution E changes *where* the random surfer is allowed to ""teleport,"" which in turn reshapes the stationary distribution of the walk (the rank vector). A uniform E yields the global, democratic PageRank; concentrating E on a user's bookmarks, home page, or a single seed page yields a personalized PageRank biased toward content relevant to that user's context.",good,"The final answer correctly explains that changing the source distribution E changes the teleportation distribution of the random surfer, thereby personalizing PageRank. It mentions uniform E for global PageRank, biased E for personalized rankings, concrete examples like the Netscape and McCarthy pages, bookmarks/home page personalization, and the manipulation resistance of personalized PageRank. This matches the key information in Section 6 of the original paper, even if not word-for-word.",bad,"The search queries are relevant and include important keywords such as source distribution, personalized PageRank, E vector, teleportation, and bookmarks. However, the agent made six search calls, many of which overlap heavily: several are variations on topic-sensitive or personalized PageRank with biased teleportation vectors. The first exact query would likely have been sufficient, and there is no clear need for this many redundant searches. The trajectory is therefore inefficient and not fully justified."
+"2. What makes epoch-based reclamation easier to use than quiescent-state-based reclamation, and why does it still add overhead?","Based on the paper database, the key source here is Hart et al., *""Making Lockless Synchronization Fast: Performance Implications of Memory Reclamation""* (IPDPS 2006), which directly compares quiescent-state-based reclamation (QSBR) and epoch-based reclamation (EBR).
+
+## Why EBR is easier to use than QSBR
+
+**QSBR requires application-dependent quiescent states.** A quiescent state for a thread is a state in which it holds no references to shared nodes, and a grace period is any interval during which *all* threads pass through at least one quiescent state. The catch is that *the choice of quiescent states is application-dependent* — the programmer must explicitly flag quiescent states at a higher level in the application code (they are not detected automatically). This works naturally in OS kernels that have built-in quiescent points like voluntary context switches (which is how QSBR underpins RCU), but for a general lock-free data structure, the programmer must manually identify and annotate safe points.
+
+**EBR's bookkeeping is invisible to the application programmer.** In EBR, each thread atomically sets a per-thread flag when it enters a critical region (indicating it intends to access shared data without locks) and atomically clears it on exit; no thread may access an EBR-protected object outside a critical region. Threads track a global epoch (mod 3), and any node removed in epoch *e* can be reclaimed when the thread re-enters that epoch. Because the epoch bookkeeping is handled automatically at critical-region entry/exit, EBR is application-independent — the programmer just wraps operations in critical regions, and reclamation machinery is taken care of. The paper explicitly states: *""EBR's bookkeeping is invisible to the applications programmer, making it easy for a programmer to use.""* In the example list-search code, QSBR and EBR are identical except EBR adds the two lines of epoch bookkeeping at the start and end of the operation, whereas QSBR's quiescent states are flagged explicitly at a higher level.
+
+## Why EBR still adds overhead
+
+The same automatic bookkeeping that makes EBR easy to use is also the source of its cost, which the paper finds is *significant* (often exceeding hazard-pointer-based reclamation):
+
+- **Two memory fences per operation.** EBR requires one fence when setting the flag upon entering a critical region and another when clearing it upon exit — two fences per lockless operation. QSBR has *no per-operation fences*, so its per-operation overhead can be very low. This is identified as the key difference between the two: the paper's conclusion notes, *""HPBR and EBR have higher base costs than QSBR due to their required fences,""* and EBR's overhead is constant (two fences), unlike HPBR's unbounded per-node fence cost.
+- **Atomic flag operations on every critical region.** Each thread must atomically set and clear its per-thread flag on every entry/exit, adding per-operation atomic traffic even on fast paths.
+- **Blocking behavior.** Like QSBR, EBR is a *blocking* scheme: grace periods force threads to wait for others, and threads that fail or are delayed inside critical regions can stall reclamation, eventually causing memory exhaustion and blocking. (A mitigating point: threads *not* in critical regions cannot stall EBR, whereas in QSBR a single thread that skips quiescent states blocks all reclamation.)
+- The paper also notes that this per-operation fence overhead can be partially amortized: their proposed ""new epoch-based reclamation"" (NEBR) moves the flag set/clear to the application level so fences amortize over more operations — but that necessarily *compromises EBR's application independence*.
+
+Additional corroboration comes from the wait-free queue paper (Yang & Mellor-Crummey, 2016), which notes that on weakly ordered architectures (e.g., Power), epoch-based reclamation requires a full `sync` fence after setting a hazard/epoch pointer and a lightweight `lwsync` before clearing it — the same fence cost pattern as other epoch-based strategies (on x86, atomics flush store buffers so no extra fence is needed).
+
+**In short:** EBR trades usability for overhead — it automates grace-period detection (no application-level quiescent-state annotation, unlike QSBR), but pays for that automation with two fences and atomic flag operations on every lockless operation, which QSBR avoids.",good,"The agent's answer correctly identifies that EBR is easier to use than QSBR because QSBR requires application-dependent quiescent states while EBR's epoch bookkeeping is automatic and invisible to the programmer. It also correctly explains that EBR adds overhead due to two memory fences per operation and atomic flag set/clear on every critical region, which QSBR avoids. The answer matches the key information from the ground truth.",bad,"The search queries are relevant and contain important keywords from the question, but the agent made five search calls, which is more than necessary. Queries 2 and 3 are largely redundant, both focusing on EBR fences and the absence of quiescent states, and query 5 is only tangentially necessary for the final answer. With a single paper as the likely source, one or two targeted searches would have sufficed. The tool calls therefore include unnecessary duplication."
+1. Why are input and output treated as primitive operations rather than just assignment or shared-memory updates?,"Based on the papers in my database, this question is answered most directly by C.A.R. Hoare's *Communicating Sequential Processes* (CSP) work (both the 1978 CACM paper and the subsequent CSP book), which argues that input/output must be **primitives of concurrent programming** rather than derived from assignment or shared-memory updates. Here is the reasoning as it appears in those sources:
+
+## 1. Shared memory is rejected as the communication mechanism
+Hoare explicitly rejects communication by ""inspection and updating of a common store (as in Algol 68, PL/I, and many machine codes)"":
+
+> ""However, this can create severe problems in the construction of correct programs and it may lead to expense (e.g. crossbar switches) and unreliability (e.g. glitches) in some technologies of hardware implementation."" — CSP (1978), Introduction
+
+His essential proposals are therefore: (a) processes **may not communicate with each other by updating global variables**, and (b) ""simple forms of input and output command are introduced. They are used for communication between concurrent processes."" — CSP (1978), Introduction
+
+## 2. A single assignment cannot express cross-process communication
+The interesting subtlety is that input/output *has the effect of an assignment* — but one that requires the simultaneous participation of two processes:
+
+> ""Communication occurs between two processes of a parallel command whenever (1) an input command in one process specifies as its source the process name of the other process; (2) an output command in the other process specifies as its destination the process name of the first process; and (3) the target variable of the input command matches the value denoted by the expression of the output command. On these conditions, the input and output commands are said to correspond. **Commands which correspond are executed simultaneously**, and their combined effect is to assign the value of the expression of the output command to the target variable [of the input command]."" — CSP (1978), section on input/output commands
+
+So an ordinary assignment cannot model this: the value is produced by one process and consumed by another *at the same instant*, and neither command can complete until its counterpart is ready. A shared-variable write gives no such guarantee — the writer cannot know when (or whether) the reader has observed the update, and extra coordination machinery is required.
+
+## 3. Input/output fuse data transfer with synchronization
+In CSP, communication is **synchronized by construction**:
+
+> ""There is no automatic buffering: In general, an input or output command is delayed until the other process is ready with the corresponding output or input. Such delay is invisible to the delayed process."" — CSP (1978)
+
+The CSP book states the same point: ""communication is a special case of interaction between two processes, one of which outputs a message at the same time as the other one inputs it. Thus **communication is synchronised**; if buffering is required on a channel, this is achieved by interposing a buffer process between the two processes."" This means synchronization and data transfer are fused into one indivisible primitive — you cannot get one without the other, whereas an assignment to a shared variable conveys data with no synchronization semantics at all (you'd need semaphores, monitors, or critical regions on top).
+
+## 4. Synchronous primitives are deliberately chosen over buffered ones
+Hoare considers the alternative — letting an outputting process proceed even when the inputting process is not ready, with the implementation interposing buffers — and rejects it:
+
+> ""I have deliberately rejected this alternative, for two reasons: (1) It is less realistic to implement in multiple disjoint processors, and (2) when buffering is required on a particular channel, it can readily be specified using the given primitives."" — CSP (1978)
+
+This inverts the usual reduction: rather than deriving synchronization from buffered assignment, he makes the synchronous rendezvous primitive and *builds buffering on top of it* (e.g., by inserting a buffer process), which is a construction that works even across disjoint processors with no shared store.
+
+## 5. Historical context: why shared variables were abandoned
+The CSP book recounts that the earlier approach — Dijkstra's critical regions protected by semaphores over shared main storage, formalized as ""shared variables"" accessed only inside `with ... do` critical regions — was the original technique, but the control of sharing is inherently complicated:
+
+> ""However, it is now clear ... that the control of sharing requires complication, whether it is expressed within the conceptual framework of communicating processes or within the copy-rule and procedure-call semantics of PASCAL PLUS."" — CSP book, Ch. 6
+
+The book also notes that the ""shared resource"" method lets a compiler insert semaphores and check accesses statically, but it still forces processes into explicit, error-prone mutual-exclusion discipline — whereas communication by input/output channels gives processes a simpler, more abstract interaction model.
+
+## Conclusion
+In summary, per these papers, input and output are treated as primitive operations because (1) shared-memory updates create severe correctness problems and hardware expense/unreliability; (2) communication between processes is not expressible as a one-sided assignment — it requires two processes acting simultaneously, i.e., a synchronized rendezvous; (3) input/output thereby combine data transfer and synchronization into a single indivisible operation, with no automatic buffering; and (4) the synchronous primitive is the more realistic and composable base — buffering and other constructs are built *on top of* it, not the reverse. As Hoare concludes, ""input, output, and concurrency should be regarded as primitives of programming, which underlie many familiar and less familiar programming concepts.""",good,"The agent answer is correct and aligns with the original CSP content. It explains that Hoare treats input/output as primitives because shared-memory updates cause correctness and hardware problems, because communication requires simultaneous participation of two processes and thus cannot be reduced to one-sided assignment, and because input/output combine data transfer with synchronization. These points are supported by relevant quotes from the 1978 CSP paper and the CSP book. The answer is somewhat more detailed than the original excerpt but contains the same key information.",bad,"The search queries were relevant and included important keywords such as CSP, Hoare, input, output, primitive, assignment, shared memory, communication, and synchronization. However, the agent made nine search calls, which is excessive for a single conceptual question. Many queries were near-duplicates and did not meaningfully refine the search. There is no clear reason for this many calls, so the trajectory is not efficient."
+"3. What makes guarded input different from ordinary input, especially inside alternatives and loops?","Based on C.A.R. Hoare's *Communicating Sequential Processes* paper (the relevant source in the database), the key differences are:
+
+## Core distinction: guarded input can *fail*; ordinary input just blocks
+
+**Ordinary input** (`X?target`) is a command in a command list. It is executed only by synchronizing with a corresponding output command; if the partner isn't ready, the process simply *waits*. The only way an ordinary input fails is if its source process has already terminated — otherwise it blocks indefinitely:
+
+> ""An input command fails if its source is terminated... The delay is ended when the corresponding command in the other process is also ready, or when the other process terminates. In the latter case the first command fails.""
+
+**Guarded input** is an input command placed at the *end of a guard*. It is not a guaranteed step of execution but a *testable condition*: the guarded command is selected ""only if and when the source named in the input command is ready to execute the corresponding output command."" Crucially, a guard that ends in an input can be *tried and abandoned* if it cannot synchronize, because a discontinued execution has no effect on the process state.
+
+## Inside alternatives (alternative commands)
+
+- An alternative command executes **exactly one** of its constituent guarded commands; if all guards fail, the alternative command fails.
+- With input guards, the command is held until one of two things happens: (1) a corresponding output command becomes ready (that guard is selected, and the choice among several ready guards is arbitrary), or (2) the source terminates — in which case that input guard fails and another alternative can be chosen.
+- If **all** input guards' sources have terminated, the whole alternative fails. So guarded input converts ""blocking on one fixed channel"" into nondeterministic selection among whichever partners are ready — unlike ordinary input, which commits to a single fixed communication.
+
+## Inside loops (repetitive commands)
+
+- A repetitive command iterates its alternative command as many times as possible and terminates with no effect when all guards fail.
+- If all true guard lists end in an input guard, the loop is delayed until either (1) a corresponding output becomes ready (one iteration executes), or (2) **all sources named by the input guards have terminated** — in which case the repetitive command **terminates successfully**.
+- If neither event ever occurs, the process fails in deadlock.
+- This automatic termination on source termination is what distinguishes guarded input in loops: an ordinary input inside a loop body would block forever once its source terminates, whereas a guarded input gives the loop a well-defined way to detect that its partners are done and exit. Hoare notes this is ""extremely powerful and convenient"" but ""not primitive,"" since the same effect can be obtained (with considerable inconvenience) by explicit exchange of ""end"" signals.
+
+## Practical consequence
+
+Because a guard ending in input can be abandoned without side effects, an implementation may ""test whether a guard fails simply by trying to execute it, and discontinuing execution if and when it fails."" This is exactly what enables fair, responsive scheduling (e.g., preferring the earliest ready output command) and makes guarded input the mechanism for building monitors and servers that communicate with whichever of many user processes is ready first.",good,"The final answer accurately explains the difference between guarded and ordinary input, directly tied to Hoare's CSP paper. It covers that ordinary input blocks until a corresponding output or source termination, while guarded input acts as a selectable guard that can be tested and abandoned without side effects. It correctly describes behavior inside alternatives: exactly one guarded command is selected when its input guard is ready, and the alternative fails if all guards fail. It also correctly explains loops: when all true guard lists end in input guards, the repetitive command terminates when all named sources have terminated, otherwise it may deadlock. This matches the key information in the original source.",bad,"The search queries are relevant and contain important keywords from the question. However, the agent issued six searches that are largely paraphrases of the same query rather than progressive refinements. With no tool results shown to indicate that earlier searches were insufficient, six near-duplicate searches are excessive and not reasonably necessary for this question. The later calls do not clearly narrow or improve the search, so the trajectory is not efficient."
+4. How can coroutines be used to model subroutines or even multiple-entry procedures?,"Based on the papers in the database, the most direct treatment of this question comes from **C.A.R. Hoare's ""Communicating Sequential Processes"" (CSP, 1978)** and its companion book.
+
+## Coroutines as a more fundamental structure than subroutines
+
+Hoare's paper states that in parallel programming, **coroutines are a more fundamental program structure than subroutines, and subroutines can be regarded as a special case of them** (CSP paper, chunk 39). This is elaborated in a dedicated section:
+
+> ""A conventional nonrecursive subroutine can be readily implemented as a coroutine, provided that (1) its parameters are called 'by value' and 'by result,' and (2) it is disjoint from its calling program."" (CSP paper, chunk 45)
+
+The mechanism works because in CSP, communication between processes (coroutines) is by explicit input/output commands: a caller sends parameters to the coroutine via output commands, and the coroutine receives them via input commands; results are returned the same way in reverse.
+
+## Modeling subroutines
+
+Key properties that make this modeling work, as described in the paper:
+
+- **Parameter passing by value and by result**: This is the necessary condition, since a coroutine cannot share arbitrary storage with its caller (they must be ""disjoint""). Parameters are passed as messages rather than by reference.
+- **Retention of local state**: Like a Fortran subroutine, a coroutine may retain the values of its local variables between activations (""own variables, in Algol terms""). This persistence of state is exactly what makes the coroutine-as-subroutine useful.
+
+## Modeling multiple-entry procedures
+
+The paper explicitly addresses multiple-entry procedures:
+
+> ""It may use input commands to achieve the effect of 'multiple entry points' in a safer way than PL/I.""
+
+The idea is that each distinct input command in the coroutine serves as a separate entry point. Whereas PL/I's `ENTRY` declarations allow multiple labeled entry points into a procedure, a coroutine achieves the same effect by having the process choose among alternative input commands — each input command can be thought of as a distinct entry point that the caller can invoke. This is ""safer"" because the coroutine itself controls which inputs it is willing to accept at any given point in its execution.
+
+## Broader implications
+
+The passage continues with a striking observation:
+
+> ""Thus a coroutine can be used like a SIMULA class instance as a concrete representation for abstract data."" (CSP paper, chunk 45)
+
+Because the coroutine retains state between calls and exposes only communication interfaces, it behaves like an object with encapsulated state — the same idea underlying SIMULA 67 classes and, later, abstract data types.
+
+The CSP book extends this with the notion of a **re-entrant subroutine**, which is defined as an array of concurrent processes:
+
+> ""A subroutine capable of several concurrent instances is known as re-entrant, and it is defined as an array of concurrent processes."" The index of the array instance ""ensures that the result of the call is obtained from the same instance"" to which the arguments were sent, even when calls from different processes interleave. (CSP book, chunk 464)
+
+## Summary
+
+In this framework: a **subroutine** = a coroutine that receives parameters via input commands and returns results via output commands, with call-by-value/call-by-result parameter passing and disjointness from its caller; a **multiple-entry procedure** = a coroutine with several input commands, each acting as a distinct (and safer-than-PL/I) entry point; and the coroutine's persistent local state makes it equivalent to a SIMULA class instance, i.e., a concrete representation of an abstract data type.",good,"The agent answer correctly identifies Hoare's CSP paper as the source and explains that coroutines are more fundamental than subroutines, with subroutines as a special case. It includes the key conditions: parameters must be called by value and by result, and the coroutine must be disjoint from the calling program. It also explains multiple-entry procedures via multiple input commands, mentions persistence of local state, and the comparison to SIMULA classes. This matches the key information in the original ground truth.",bad,"The search queries were relevant and contained important keywords from the question, such as coroutines, subroutines, multiple-entry procedures, by value/by result, and disjoint. However, the agent made 8 search calls, many of which were highly similar and repetitive rather than meaningfully refining the search. More than 3 calls typically require a clear reason, and here the later queries largely rephrased the same concepts without adding substantial new angles. This appears excessive and not well justified."
+"2. Why does the skew heap balance property fail after deletions, even though inserts preserve the heap invariant?","Based on the papers in the database (primarily the *QuickCheck Testing for Fun and Profit* paper, which explicitly investigates this question), here is the answer:
+
+## The heap invariant vs. the balance property are two different things
+
+First, note the distinction. The **heap invariant** (heap order: every node ≤ its descendants) *is* preserved by both insertions and deletions — QuickCheck verified `prop_invariant OK, passed 100 tests`. It is the **balance property** (roughly equal left/right subtree sizes) that breaks after deletions:
+
+> ""and that skew heaps remain balanced: `quickCheck prop_balanced` **Falsifiable, after 37 tests** … Oh dear! Clearly, deletion does not preserve the balance condition.""
+
+## Why inserts preserve balance
+
+Insertion is explicitly designed to keep subtrees balanced. The insert operation always inserts into the left subtree and then swaps the two subtrees, ""skewing"" the heap:
+
+> `insert x (Fork y l r) = Fork (min x y) r (insert (max x y) l)`
+> ""we always insert into the left subtree, but swap the subtrees after each insertion — skewing the heap — so that the next insertion chooses the other subtree.""
+
+The intended invariant is that the left subtree is never larger than the right; the balance conjecture tested is `weight r − weight l ∈ {0, 1}` at every node. This holds for heaps built purely by insertion.
+
+## Why deletions break it
+
+**1. `deleteMin` is just a merge of two subtrees.** Deleting the minimum discards the root and merges its two children:
+
+> `deleteMin (Fork x l r) = merge l r`
+
+**2. `merge` only rebalances the right spine it walks down, not the whole tree.** The join step is:
+
+> `join (Fork x l r) h = Fork x r (merge l h)`
+
+The trick is that recursion goes into the left subtree (the smaller one by the insertion invariant), which at least halves the size at each call and keeps merge logarithmic *when the heaps are well-formed*. But merge only swaps children along that single traversal path; subtrees hanging off the path are left untouched. Merging the root's two subtrees — which, after a history of mixed insertions and deletions, may have very different sizes and shapes — produces new nodes where the left subtree outweighs the right.
+
+**3. Even the weaker ""good"" property fails.** The paper relaxes the balance condition to just `weight l <= weight r` (""good"" nodes), noting ""all we really needed above was that the left subtree is no larger than the right."" But even this fails:
+
+> `quickCheck prop_AllGood` **Falsifiable, after 55 tests** … ""Evidently, skew heaps contain a mixture of good and bad nodes.""
+
+## Why skew heaps are still efficient (amortized)
+
+The balance property is not a global invariant of the heap; it is only a property of the insertion-only construction process. However, efficiency survives because skew heaps are analyzed *amortized*, not worst-case:
+
+> ""Consulting Okasaki, we find the key insight behind the efficiency of skew heaps: although bad nodes are more costly to process, they are cheaper to construct! Whenever we construct a bad node with a large left subtree, then at the same time we recurse to create an unusually small right subtree — so this recursion is cheaper than expected. What we lose on the swings, we regain on the roundabouts, making for logarithmic amortized complexity.""
+
+**In short:** inserts preserve balance because the insert routine is engineered to keep the left subtree no larger than the right and alternates sides. Deletions (`deleteMin = merge l r`) combine two arbitrarily shaped subtrees, and the merge heuristic only restructures the right spine — it restores neither the strict balance (`|d| ≤ 1`) nor even the weaker left ≤ right condition at every node. The balance guarantee is therefore not an invariant of the data structure; skew heaps contain a mixture of ""good"" and ""bad"" nodes, and only logarithmic *amortized* bounds (via the trade-off that bad nodes are cheap to construct) are claimed.",good,"The answer correctly identifies that the heap invariant is preserved, but the balance property is not; it explains that insertions maintain balance by always inserting into the left subtree and swapping, while deletions merge the root's two subtrees, and the merge algorithm only restructures the right spine, so it does not restore balance. It also mentions the weaker 'good' property fails and gives the amortized explanation. This matches the key information in the ground truth section on skew heaps.",bad,"All search queries are relevant to the question and contain important keywords such as 'skew heap', 'balance', 'deleteMin', and 'merge'. However, the agent made eight search calls, many of which are highly similar or redundant, and several include unnecessary terms like 'Sleator Tarjan' and 'leftist heaps' that do not appear in the final answer. The later queries do not demonstrate clear iterative refinement; they simply rephrase the same search intent. A smaller number of searches (1-3) would likely have been sufficient."
