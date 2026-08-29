@@ -17,7 +17,7 @@ MODELS = {
 if "rag" not in st.session_state:
     st.session_state.rag = RAG()
 if "selected_model" not in st.session_state:
-    st.session_state.selected_model = "gpt-5.4-mini"
+    st.session_state.selected_model = "deepseek-v4-flash"
 
 if "history" not in st.session_state:
     st.session_state.history = []
