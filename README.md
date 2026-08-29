@@ -6,6 +6,9 @@ leader election?"* or *"What is the time complexity of a wait-free queue?"* and 
 corpus of 400+ CS papers, then answers using only what it finds — it won't make things up, and
 it won't answer questions outside its paper database.
 
+**Live app:** https://sayargyi.space &nbsp;•&nbsp; **Live dashboard:**
+[Grafana Cloud](https://minsanwork.grafana.net/public-dashboards/a8412f0b95e84a8d94ea966e457bf69e?from=now-30d&to=now&timezone=browser)
+
 ## Table of contents
 
 - [Problem](#problem)
@@ -15,9 +18,11 @@ it won't answer questions outside its paper database.
 - [Architecture](#architecture)
 - [Evaluation](#evaluation)
 - [Monitoring](#monitoring)
+- [Deployment](#deployment)
 - [Getting started](#getting-started)
 - [Usage examples](#usage-examples)
 - [Project structure](#project-structure)
+- [Evaluation criteria](#evaluation-criteria)
 - [Limitations & ideas for improvement](#limitations--ideas-for-improvement)
 
 ## Problem
@@ -39,8 +44,9 @@ Sayargyi solves this by combining:
 
 ## Demo
 
-The app is a Streamlit chat UI. It shows the answer plus per-question stats (response time,
-tokens, cost) and lets you expand each answer to see the exact search calls the agent made.
+The app is a Streamlit chat UI, live at **https://sayargyi.space**. It shows the answer plus
+per-question stats (response time, tokens, cost) and lets you expand each answer to see the exact
+search calls the agent made.
 
 ![Streamlit app screenshot placeholder](docs/images/app-screenshot.png)
 *(Run the app locally and drop a screenshot here — see [`app.py`](app.py). Streamlit's
@@ -99,8 +105,10 @@ fields, which `ingest/ingest.py` chunks and indexes.
 | **cross-encoder reranker** | Reorders fused search results by relevance |
 | **OpenAI / DeepSeek** | LLM providers for the agent and the judge |
 | **Grafana** | Dashboards over conversation/feedback data in Postgres |
+| **AWS (ECS Fargate, RDS, ALB, Route 53)** | Production hosting, provisioned with Terraform |
 
-All services are wired up in [`docker-compose.yml`](docker-compose.yml).
+All services are wired up in [`docker-compose.yml`](docker-compose.yml) for local development, and
+in [`terraform/`](terraform) for the AWS deployment.
 
 ## Evaluation
 
@@ -137,8 +145,19 @@ reading from Postgres, showing:
 - User feedback (collected via the 👍/👎 buttons in the app, and from the judge)
 - Input token usage
 
+The production dashboard is public on Grafana Cloud:
+**[minsanwork.grafana.net](https://minsanwork.grafana.net/public-dashboards/a8412f0b95e84a8d94ea966e457bf69e?from=now-30d&to=now&timezone=browser)**.
+
 ![Grafana dashboard screenshot placeholder](docs/images/grafana-screenshot.png)
 *(Add a screenshot of the running dashboard here once you have some conversations logged.)*
+
+## Deployment
+
+Sayargyi is deployed live on AWS and reachable at **https://sayargyi.space**. The whole stack
+(container registry, ECS Fargate service, managed Postgres, load balancer with HTTPS, DNS) is
+defined as infrastructure-as-code with Terraform under [`terraform/`](terraform), so it can be
+stood up with `terraform apply` from `terraform/environmnets/prod`. The public monitoring
+dashboard is hosted on Grafana Cloud (linked above).
 
 ## Getting started
 
@@ -248,6 +267,8 @@ ingest/ingest.py       Chunk papers, index in Meilisearch, embed for pgvector
 papers/                426 CS paper JSON files (source corpus)
 evaluations/           Ground truth, retrieval eval, agent/LLM eval notebooks and results
 grafana/               Provisioned dashboard + datasource for monitoring
+snapshots/             Pre-built corpus snapshot (Postgres + Meilisearch) to skip ingestion
+terraform/             AWS infra as code: ECR, ECS Fargate, RDS, ALB, ACM, Route 53
 Dockerfile             Container image for the Streamlit app
 docker-compose.yml     App, Postgres/pgvector, Meilisearch, Grafana services
 ```
