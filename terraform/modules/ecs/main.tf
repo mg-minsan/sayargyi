@@ -21,6 +21,10 @@ data "aws_secretsmanager_secret" "meilisearch_key" {
   name = "sayargyi/meili-master-key"
 }
 
+data "aws_secretsmanager_secret" "pdc_agent_token" {
+  name = "sayargyi/pdc-agent-token"
+}
+
 resource "aws_security_group" "allow_8501" {
   name        = "allow_8501"
   description = "Allow inbound traffic on port 8501 and all outbound traffic"
@@ -70,6 +74,7 @@ resource "aws_iam_role_policy" "secrets_access" {
         data.aws_secretsmanager_secret.openai_api_key.arn,
         data.aws_secretsmanager_secret.deepseek_api_key.arn,
         data.aws_secretsmanager_secret.meilisearch_key.arn,
+        data.aws_secretsmanager_secret.pdc_agent_token.arn,
         var.db_password_secret_arn,
       ]
     }]
@@ -117,8 +122,8 @@ resource "aws_ecs_task_definition" "sayargyi" {
     network_mode             = "awsvpc"
     # cpu                      = "512"
     # memory                   = "1024"
-    cpu                      = "1024"
-    memory                   = "2048"
+    cpu                      = "512"
+    memory                   = "1024"
     execution_role_arn       = aws_iam_role.sayargyi_ecs_role.arn
     task_role_arn            = aws_iam_role.sayargyi_ecs_task_role.arn
     volume {
@@ -267,4 +272,81 @@ resource "aws_efs_mount_target" "sayargyi" {
   file_system_id  = aws_efs_file_system.sayargyi.id
   subnet_id       = each.value
   security_groups = [aws_security_group.efs.id]
+}
+
+# Grafana Cloud Private Datasource Connect agent: tunnels the hosted Grafana dashboard to RDS.
+resource "aws_cloudwatch_log_group" "pdc_agent" {
+  name              = "/ecs/pdc_agent"
+  retention_in_days = 7
+}
+
+resource "aws_security_group" "pdc_agent" {
+  name        = "pdc_agent"
+  description = "No inbound; outbound HTTPS to Grafana Cloud and Postgres to RDS"
+  vpc_id      = data.aws_vpc.default.id
+  egress {
+    description = "HTTPS to Grafana Cloud"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "Postgres to RDS"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "SSH tunnel to Grafana Cloud PDC gateway"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_ecs_task_definition" "pdc_agent" {
+  family                   = "pdc-agent"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.sayargyi_ecs_role.arn
+  task_role_arn            = aws_iam_role.sayargyi_ecs_task_role.arn
+  container_definitions = jsonencode([{
+    name      = "pdc-agent"
+    image     = "grafana/pdc-agent:latest"
+    essential = true
+    command = [
+      "-cluster", "prod-ap-southeast-1",
+      "-gcloud-hosted-grafana-id", "1243720",
+    ]
+    secrets = [{
+      name      = "GCLOUD_PDC_SIGNING_TOKEN"
+      valueFrom = data.aws_secretsmanager_secret.pdc_agent_token.arn
+    }]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.pdc_agent.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "pdc-agent"
+      }
+    }
+  }])
+}
+
+resource "aws_ecs_service" "pdc_agent" {
+  name            = "pdc_agent_service"
+  cluster         = aws_ecs_cluster.sayargyi.id
+  task_definition = aws_ecs_task_definition.pdc_agent.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+  network_configuration {
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.pdc_agent.id]
+    assign_public_ip = true
+  }
 }

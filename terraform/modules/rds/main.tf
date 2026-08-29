@@ -18,14 +18,14 @@ resource "aws_security_group" "rds-allow" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    security_groups = [var.ecs_security_group_id]
+    security_groups = [var.ecs_security_group_id, var.pdc_security_group_id]
   }
   egress {
     description     = "Allow outbound to ECS only"
     from_port       = 0
     to_port         = 0
     protocol        = "-1"
-    security_groups = [var.ecs_security_group_id]
+    security_groups = [var.ecs_security_group_id, var.pdc_security_group_id]
   }
 }
 

@@ -34,6 +34,7 @@ module "alb" {
 module "rds" {
   source = "../../modules/rds"
   ecs_security_group_id = module.ecs.security_group_id
+  pdc_security_group_id = module.ecs.pdc_security_group_id
 }
 
 module "route53" {
