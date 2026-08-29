@@ -196,6 +196,9 @@ uv run python -m ingest.ingest
 This chunks every paper in [`papers/`](papers), indexes them in Meilisearch, and embeds them for
 vector search.
 
+> **Skip ingestion:** re-embedding 400+ papers is slow. If you just want to run the app, restore the
+> pre-built snapshot instead — see [`snapshots/README.md`](snapshots/README.md).
+
 ### 6. Run the app
 
 Either run it directly:
@@ -212,24 +215,6 @@ docker compose up -d --build app
 ```
 
 Open the URL Streamlit prints (usually `http://localhost:8501`).
-
-> **Corporate network / self-signed certificate errors?** If the container fails on startup with
-> an `SSLError`/`CERTIFICATE_VERIFY_FAILED` while downloading the embedding or reranker model from
-> `huggingface.co`, it's usually a corporate TLS-inspecting proxy that the container doesn't trust.
-> `docker-compose.yml` mounts your host's `~/.cache/huggingface` into the container, so the fix is
-> to pre-download the models once on the host (where your machine already trusts that proxy), then
-> the container will reuse the cached files instead of hitting the network:
->
-> ```bash
-> uv run python -c "
-> from sentence_transformers import SentenceTransformer, CrossEncoder
-> SentenceTransformer('all-MiniLM-L6-v2', backend='onnx', model_kwargs={'file_name': 'onnx/model_qint8_arm64.onnx', 'provider': 'CPUExecutionProvider'})
-> CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
-> "
-> ```
->
-> Once cached, you can also set `HF_HUB_OFFLINE=1` before `docker compose up` to stop the app from
-> ever trying to reach `huggingface.co` again.
 
 ## Usage examples
 
