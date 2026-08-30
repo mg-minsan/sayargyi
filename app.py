@@ -94,6 +94,10 @@ for i, entry in enumerate(st.session_state.history):
             f"🔢 {entry['usage']['total_tokens']:,} tokens · "
             f"💵 ${entry['usage']['cost']:.4f}"
         )
+        if entry.get("save_error"):
+            st.warning(f"Couldn't save this conversation for monitoring: {entry['save_error']}")
+        if entry.get("judge_error"):
+            st.warning(f"Judge evaluation failed: {entry['judge_error']}")
         render_feedback(entry, i)
 
 question = st.chat_input("Ask a question about the papers...")
@@ -107,18 +111,21 @@ if question:
             answer = st.session_state.rag.rag(question)
 
     rag = st.session_state.rag
+    save_error = None
     try:
         conversation_id = save_conversation(rag.last_usage)
     except Exception as e:
         conversation_id = None
-        st.warning(f"Couldn't save this conversation for monitoring: {e}")
+        save_error = str(e)
 
+    judge_error = None
     if conversation_id:
-        try:
-            relevance, score, explanation = evaluate_relevance(question, answer)
-            save_feedback(conversation_id, source="judge", relevance=relevance, explanation=explanation, score=score)
-        except Exception as e:
-            st.warning(f"Couldn't save the judge evaluation: {e}")
+        with st.spinner("⚖️ Evaluating answer..."):
+            try:
+                relevance, score, explanation = evaluate_relevance(question, answer)
+                save_feedback(conversation_id, source="judge", relevance=relevance, explanation=explanation, score=score)
+            except Exception as e:
+                judge_error = str(e)
 
     st.session_state.history.append({
         "question": question,
@@ -126,6 +133,8 @@ if question:
         "tool_calls": rag.tool_calls,
         "usage": rag.last_usage,
         "conversation_id": conversation_id,
+        "save_error": save_error,
+        "judge_error": judge_error,
         "feedback": None,
     })
     st.rerun()

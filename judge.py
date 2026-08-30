@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI
 
 
 class RelevanceVerdict(BaseModel):
-    relevance: Literal["NON_RELEVANT", "PARTLY_RELEVANT", "RELEVANT"]
+    relevance: Literal["NON_RELEVANT", "RELEVANT"]
     explanation: str
 
 judge_instructions = """
@@ -17,8 +17,11 @@ Analyze the relevance of the generated answer to the given question.
 
 Classify the answer as:
 - RELEVANT: the answer addresses the question
-- PARTLY_RELEVANT: the answer partially addresses the question
 - NON_RELEVANT: the answer does not address the question
+
+If the answer only partially addresses the question, judge it by whether a
+researcher would consider their question answered: if the key point is covered,
+choose RELEVANT; otherwise choose NON_RELEVANT.
 """.strip()
 
 judge_prompt = """
@@ -44,7 +47,6 @@ def evaluate_relevance(question, answer):
     );
     relevance_score = {
             "RELEVANT": 1,
-            "PARTLY_RELEVANT": 0.5,
             "NON_RELEVANT": 0,
     }
 
