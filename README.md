@@ -48,7 +48,7 @@ The app is a Streamlit chat UI, live at **https://sayargyi.space**. It shows the
 per-question stats (response time, tokens, cost) and lets you expand each answer to see the exact
 search calls the agent made.
 
-![Streamlit app screenshot placeholder](docs/images/app-screenshot.png)
+![demo of the Sayargyi app](assets/app.png)
 *(Run the app locally and drop a screenshot here — see [`app.py`](app.py). Streamlit's
 top-right menu also lets you record a short screen capture of a session.)*
 
