@@ -2,6 +2,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from rag import RAG
 from db.query import save_conversation, save_feedback
+from judge import evaluate_relevance
 
 load_dotenv()
 
@@ -111,6 +112,13 @@ if question:
     except Exception as e:
         conversation_id = None
         st.warning(f"Couldn't save this conversation for monitoring: {e}")
+
+    if conversation_id:
+        try:
+            relevance, score, explanation = evaluate_relevance(question, answer)
+            save_feedback(conversation_id, source="judge", relevance=relevance, explanation=explanation, score=score)
+        except Exception as e:
+            st.warning(f"Couldn't save the judge evaluation: {e}")
 
     st.session_state.history.append({
         "question": question,
