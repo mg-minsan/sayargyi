@@ -145,11 +145,9 @@ reading from Postgres, showing:
 - User feedback (collected via the 👍/👎 buttons in the app, and from the judge)
 - Input token usage
 
-The production dashboard is public on Grafana Cloud:
-**[minsanwork.grafana.net](https://minsanwork.grafana.net/public-dashboards/a8412f0b95e84a8d94ea966e457bf69e?from=now-30d&to=now&timezone=browser)**.
+The production dashboard is public on Grafana Cloud
 
-![Grafana dashboard screenshot placeholder](docs/images/grafana-screenshot.png)
-*(Add a screenshot of the running dashboard here once you have some conversations logged.)*
+![Grafana dashboard screenshot ](assets/dashboard.png)
 
 ## Deployment
 
@@ -208,15 +206,53 @@ This creates the `paper_chunks`, `conversations`, and `feedback` tables.
 
 ### 5. Ingest the papers
 
+You have two options. **The snapshot restore is strongly recommended** — re-embedding 400+ papers
+from scratch is slow, whereas restoring the pre-built snapshot takes seconds.
+
+#### Option A — Restore the snapshot (recommended)
+
+The committed snapshot in [`snapshots/`](snapshots) captures the already-ingested data from both
+stores (Postgres `paper_chunks` with pgvector embeddings, and the Meilisearch index). Restore it
+instead of running ingestion:
+
 ```bash
-uv run python -m ingest.ingest
+# 1. Postgres: load rows (truncate first so re-imports don't duplicate)
+docker compose exec -T db psql -U postgres -d sayargyi -c "TRUNCATE paper_chunks"
+gunzip -c snapshots/paper_chunks.sql.gz | docker compose exec -T db psql -U postgres -d sayargyi
+
+# 2. Meilisearch: create the index, apply settings, then load documents
+curl -s -X POST http://localhost:7700/indexes \
+  -H "Authorization: Bearer ${MEILI_MASTER_KEY:-masterkey}" \
+  -H "Content-Type: application/json" \
+  --data '{"uid":"paper_chunks","primaryKey":"id"}'
+
+curl -s -X PATCH http://localhost:7700/indexes/paper_chunks/settings \
+  -H "Authorization: Bearer ${MEILI_MASTER_KEY:-masterkey}" \
+  -H "Content-Type: application/json" \
+  --data-binary @snapshots/meili_settings.json
+
+gunzip -c snapshots/meili_documents.ndjson.gz | curl -s -X POST \
+  "http://localhost:7700/indexes/paper_chunks/documents?primaryKey=id" \
+  -H "Authorization: Bearer ${MEILI_MASTER_KEY:-masterkey}" \
+  -H "Content-Type: application/x-ndjson" \
+  --data-binary @-
 ```
 
-This chunks every paper in [`papers/`](papers), indexes them in Meilisearch, and embeds them for
-vector search.
+Meilisearch processes updates asynchronously — confirm the tasks succeeded before running the app:
 
-> **Skip ingestion:** re-embedding 400+ papers is slow. If you just want to run the app, restore the
-> pre-built snapshot instead — see [`snapshots/README.md`](snapshots/README.md).
+```bash
+curl -s "http://localhost:7700/tasks?limit=5" \
+  -H "Authorization: Bearer ${MEILI_MASTER_KEY:-masterkey}"
+```
+
+See [`snapshots/README.md`](snapshots/README.md) for details and for how to regenerate the
+snapshot.
+
+#### Option B — Ingest from source
+
+Only needed if you've changed the papers or the chunking/embedding logic. This chunks every paper
+in [`papers/`](papers), indexes them in Meilisearch, and embeds them for vector search:
+
 
 ### 6. Run the app
 
